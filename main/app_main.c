@@ -7,13 +7,25 @@
 #include "esp_err.h"
 #include "esp_log.h"
 #include "esp_spiffs.h"
-#include "sound.h"
+#include "nvs_flash.h"
 
-#if CONFIG_IDF_TARGET_ESP32
+#include "sound.h"
+#include "wifi.h"
 
 static const char* TAG = "mainapp";
 
 #define PARTITION_NAME   "storage"
+
+#define APP_WIFI_AP     CONFIG_ESP_WIFI_SSID
+#define APP_WIFI_PASSWD CONFIG_ESP_WIFI_PASSWORD
+#define APP_WIFI_TRIES  CONFIG_ESP_MAXIMUM_RETRY
+
+static SWiFiSTASettings wifi_settings = {
+    .ap = APP_WIFI_AP,
+    .passwd = APP_WIFI_PASSWD,
+    .tries = APP_WIFI_TRIES,
+};
+
 
 void initSPIFFS()
 {
@@ -48,12 +60,33 @@ void initSPIFFS()
 
 }
 
-void app_main(void)
+bool initNVS()
 {
-    //initI2S();
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+          ESP_ERROR_CHECK(nvs_flash_erase());
+          ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret);
+    return false;
+}
+
+void app_init()
+{
     initSPIFFS();
     soundSetup();
-    
+    initNVS();
+
+    wifiInit();
+    wifiSTAInit();
+    wifiSTAConnect(wifi_settings);
+    wifiWaitForWifi();
+}
+
+void app_main(void)
+{
+    app_init();
+
     for (int i=0;i<1;i++){
         soundPlayFile("/fs/ALARM.wav");
         soundPlayFile("/fs/01.wav");
@@ -67,5 +100,10 @@ void app_main(void)
     for (int i=0;i<3;i++){
         soundPlayFile("/fs/SAFE.wav");
     }
+
+    while(true)
+    {
+        printf(".");
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
 }
-#endif
