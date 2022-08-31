@@ -12,6 +12,7 @@
 #include "sound.h"
 #include "wifi.h"
 #include "alert_api.h"
+#include "sntp_time.h"
 
 static const char* TAG = "mainapp";
 
@@ -20,7 +21,10 @@ static const char* TAG = "mainapp";
 #define APP_WIFI_AP     CONFIG_ESP_WIFI_SSID
 #define APP_WIFI_PASSWD CONFIG_ESP_WIFI_PASSWORD
 #define APP_WIFI_TRIES  CONFIG_ESP_MAXIMUM_RETRY
-#define ALERT_REGION (9) /* Hardcoded Kyiv oblast */
+
+static AlertRegionID_t my_alert_region = 9; /* Hardcoded Kyiv oblast */
+static uint8_t quit_start_hr = 22;
+static uint8_t quit_end_hr = 9;
 
 static SWiFiSTASettings wifi_settings = {
     .ap = APP_WIFI_AP,
@@ -83,6 +87,8 @@ void app_init()
     wifiSTAInit();
     wifiSTAConnect(wifi_settings);
     wifiWaitForWifi();
+    timeSetTimezone(UA_TZ);
+    timeSync();
 }
 
 void play_unsafe()
@@ -103,11 +109,32 @@ void play_safe()
 void alert_callback(AlertRegionID_t region, ERegionState old, ERegionState new)
 {
     ESP_LOGI(TAG, "CHANGED SAFE STATE from '%s' to '%s'", alertStateToStr(old), alertStateToStr(new));
+
+    // Check for night mode and set volume
+    uint8_t volume_div = SOUND_VOLUME_NO_DIV;
+    if (timeIsSynced()) {
+        time_t now;
+        struct tm timeinfo;
+        time(&now);
+        localtime_r(&now, &timeinfo);
+        int hr = timeinfo.tm_hour;
+        bool is_quiet = (quit_start_hr>quit_end_hr)?((hr>=quit_start_hr) && (hr>=quit_end_hr)) :
+                                                    ((hr>=quit_start_hr) && (hr<=quit_end_hr));
+        is_quiet &= (quit_start_hr!=quit_end_hr);
+        if (is_quiet) {
+            ESP_LOGI(TAG, "Quiet night mode");
+            volume_div = SOUND_VOLUME_DIV4X;
+        }
+    } else {
+        ESP_LOGI(TAG, "No time data, Full volume");
+    }
+    soundSetVolumeDiv(volume_div);
+
     if (new == eZSUnsafe) {
         play_unsafe();
         return;
     } else {
-        play_safe();
+        if (old == eZSUnsafe) play_safe();
     }
 }
 
@@ -115,7 +142,7 @@ void app_main(void)
 {
     app_init();
     alertConnect();
-    alertSetObserver(ALERT_REGION, alert_callback);
+    alertSetObserver(my_alert_region, alert_callback);
     while(true)
     {
         if (wifiIsConnected()) {

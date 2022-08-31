@@ -37,7 +37,6 @@ typedef struct _SI2SBuffers
 
 static SI2SBuffers buffers = {.current=0};
 
-
 static SAudioInfo ai = {
    .SampleRate = 16000,
    .BitsPerSample = 8,
@@ -46,6 +45,8 @@ static SAudioInfo ai = {
 
 static QueueHandle_t xPlayBufferQueue = NULL;
 static QueueHandle_t xTXDoneQueue = NULL;
+
+static uint8_t volume_div = SOUND_VOLUME_NO_DIV;
 
 static void i2s_play_task(void *userData)
 {
@@ -86,7 +87,7 @@ static bool read_chunk(FILE* f)
     size_t i2s_len = 0;
     for(int i=0; i<got;i++)
     {
-        curr->buff[i2s_len*2] = curr->buff[i2s_len*2+1] = file_buff[i]<<8&0xff00;
+        curr->buff[i2s_len*2] = curr->buff[i2s_len*2+1] = (file_buff[i]<<(8-volume_div))&0xff00;
         i2s_len++;
     }
     curr->size = got*4;
@@ -150,4 +151,9 @@ bool soundPlayFile(const char* filename)
         xQueueReceive(xTXDoneQueue, &( i2s_sent ), portMAX_DELAY );
     }
     return true;
+}
+
+void soundSetVolumeDiv(uint8_t div)
+{
+    volume_div = div;
 }
