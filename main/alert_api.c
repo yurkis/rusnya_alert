@@ -157,8 +157,8 @@ static void parse_state(char* line, size_t len)
                                                              alertStateToStr(state));
         if (zones[zone].cb) {
             zones[zone].cb((uint8_t)zone_num, zones[zone].state, state);
-            zones[zone].state = state;
         }
+        zones[zone].state = state;
     }
 }
 
