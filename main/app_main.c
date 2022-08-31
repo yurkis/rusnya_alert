@@ -11,6 +11,7 @@
 
 #include "sound.h"
 #include "wifi.h"
+#include "alert_api.h"
 
 static const char* TAG = "mainapp";
 
@@ -19,6 +20,7 @@ static const char* TAG = "mainapp";
 #define APP_WIFI_AP     CONFIG_ESP_WIFI_SSID
 #define APP_WIFI_PASSWD CONFIG_ESP_WIFI_PASSWORD
 #define APP_WIFI_TRIES  CONFIG_ESP_MAXIMUM_RETRY
+#define ALERT_REGION (9) /* Hardcoded Kyiv oblast */
 
 static SWiFiSTASettings wifi_settings = {
     .ap = APP_WIFI_AP,
@@ -83,10 +85,52 @@ void app_init()
     wifiWaitForWifi();
 }
 
+void play_unsafe()
+{
+    for (int i=0;i<3;i++){
+        soundPlayFile("/fs/ALARM.wav");
+        soundPlayFile("/fs/01.wav");
+    }
+}
+
+void play_safe()
+{
+    for (int i=0;i<3;i++){
+        soundPlayFile("/fs/SAFE.wav");
+    }
+}
+
+void alert_callback(AlertRegionID_t region, ERegionState old, ERegionState new)
+{
+    ESP_LOGI(TAG, "CHANGED SAFE STATE from '%s' to '%s'", alertStateToStr(old), alertStateToStr(new));
+    if (new == eZSUnsafe) {
+        play_unsafe();
+        return;
+    } else {
+        play_safe();
+    }
+}
+
 void app_main(void)
 {
     app_init();
-
+    alertConnect();
+    alertSetObserver(ALERT_REGION, alert_callback);
+    while(true)
+    {
+        if (wifiIsConnected()) {
+            if (!alertIsConnected())
+            {
+                alertConnect();
+            }
+        } else {
+            wifiSTAConnect(wifi_settings);
+            wifiWaitForWifi();
+        }
+        alertCheckSync();
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+/*
     for (int i=0;i<1;i++){
         soundPlayFile("/fs/ALARM.wav");
         soundPlayFile("/fs/01.wav");
@@ -105,5 +149,5 @@ void app_main(void)
     {
         printf(".");
         vTaskDelay(1000 / portTICK_PERIOD_MS);
-    }
+    }*/
 }
