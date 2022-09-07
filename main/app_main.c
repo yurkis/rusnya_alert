@@ -8,6 +8,7 @@
 #include "esp_log.h"
 #include "esp_spiffs.h"
 #include "nvs_flash.h"
+//#include "esp_app_desc.h"
 
 #include "sound.h"
 #include "wifi.h"
@@ -32,6 +33,7 @@ static SWiFiSTASettings wifi_settings = {
     .tries = APP_WIFI_TRIES,
 };
 
+//const esp_app_desc_t * app_desc;
 
 void initSPIFFS()
 {
@@ -79,6 +81,9 @@ bool initNVS()
 
 void app_init()
 {
+    /*app_desc = esp_app_get_description();
+    ESP_LOGI("App ver: %s", app_desc.version);*/
+
     initSPIFFS();
     soundSetup();
     initNVS();
@@ -135,46 +140,33 @@ void alert_callback(AlertRegionID_t region, ERegionState old, ERegionState new)
         return;
     } else {
         if (old == eZSUnsafe) play_safe();
+        else soundPlayFile("/fs/start.wav");
     }
 }
 
 void app_main(void)
 {
+    bool connection_lost = false;
     app_init();
     alertConnect();
     alertSetObserver(my_alert_region, alert_callback);
     while(true)
     {
         if (wifiIsConnected()) {
+            connection_lost = false;
             if (!alertIsConnected())
             {
                 alertConnect();
             }
         } else {
+            if (!connection_lost) {
+                connection_lost = true;
+                soundPlayFile("/fs/nowifi.wav");
+            }
             wifiSTAConnect(wifi_settings);
             wifiWaitForWifi();
         }
         alertCheckSync();
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
-/*
-    for (int i=0;i<1;i++){
-        soundPlayFile("/fs/ALARM.wav");
-        soundPlayFile("/fs/01.wav");
-    }
-
-    for (int i = 3; i >= 0; i--) {
-        printf("Restarting in %d seconds...\n", i);
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-    }
-    
-    for (int i=0;i<3;i++){
-        soundPlayFile("/fs/SAFE.wav");
-    }
-
-    while(true)
-    {
-        printf(".");
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-    }*/
 }

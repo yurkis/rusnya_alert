@@ -85,6 +85,8 @@ bool alertConnect()
     if (res < 0){
         ESP_LOGE(TAG, "Can't send");
         freeaddrinfo(result);
+        close(sfd);
+        connected = false;
         return false;
     }
 
@@ -92,6 +94,8 @@ bool alertConnect()
     if (res < 0){
         ESP_LOGE(TAG, "Can't resceive");
         freeaddrinfo(result);
+        close(sfd);
+        connected = false;
         return false;
     }
     printf("%s", buff);
@@ -117,7 +121,7 @@ static void parse_ping(char* line, size_t len)
 {
     // Ex: "p:2514"
     int num = atoi(line+2);
-    ESP_LOGI(TAG, "Ping packet %i", num);
+    //ESP_LOGI(TAG, "Ping packet %i", num);
 }
 
 static void parse_state(char* line, size_t len)
@@ -188,6 +192,8 @@ bool alertCheckSync()
     int res = recv(sfd, buff, sizeof(buff), 0);
     if (res < 0){
         ESP_LOGE(TAG, "Can't resceive");
+        close(sfd);
+        connected = false;
         return false;
     }
     char* p = buff;

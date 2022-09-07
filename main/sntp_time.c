@@ -23,7 +23,7 @@ static void time_sync_notification_cb(struct timeval *tv)
     time(&now);
     localtime_r(&now, &timeinfo);
     strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
-    ESP_LOGI(TAG, "Synced! The current date/time is: %s", strftime_buf);
+    ESP_LOGI(TAG, "Synced: %s", strftime_buf);
 }
 
 bool timeSync()
