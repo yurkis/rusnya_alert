@@ -14,6 +14,9 @@
 #include "wifi.h"
 #include "alert_api.h"
 #include "sntp_time.h"
+#include "version.h"
+#include "ota.h"
+#include "ota_https_ssl.h"
 
 static const char* TAG = "mainapp";
 
@@ -26,6 +29,8 @@ static const char* TAG = "mainapp";
 static AlertRegionID_t my_alert_region = 9; /* Hardcoded Kyiv oblast */
 static uint8_t quit_start_hr = 22;
 static uint8_t quit_end_hr = 9;
+
+SVersion my_version;
 
 static SWiFiSTASettings wifi_settings = {
     .ap = APP_WIFI_AP,
@@ -81,8 +86,7 @@ bool initNVS()
 
 void app_init()
 {
-    /*app_desc = esp_app_get_description();
-    ESP_LOGI("App ver: %s", app_desc.version);*/
+    ESP_LOGI(TAG,"\nApp ver: %s\n",APP_VERSION_STR);
 
     initSPIFFS();
     soundSetup();
@@ -94,6 +98,9 @@ void app_init()
     wifiWaitForWifi();
     timeSetTimezone(UA_TZ);
     timeSync();
+
+    my_version = otaParseVersionStr(APP_VERSION_STR);
+    otaSetCurrentVersion(my_version);
 }
 
 void play_unsafe()
