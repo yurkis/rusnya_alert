@@ -129,11 +129,8 @@ void play_safe()
     }
 }
 
-void alert_callback(AlertRegionID_t region, ERegionState old, ERegionState new)
+void check_volume()
 {
-    ESP_LOGI(TAG, "CHANGED SAFE STATE from '%s' to '%s'", alertStateToStr(old), alertStateToStr(new));
-
-    // Check for night mode and set volume
     uint8_t volume_div = SOUND_VOLUME_NO_DIV;
     if (timeIsSynced()) {
         time_t now;
@@ -145,20 +142,31 @@ void alert_callback(AlertRegionID_t region, ERegionState old, ERegionState new)
                                                     ((hr>=quit_start_hr) && (hr<=quit_end_hr));
         is_quiet &= (quit_start_hr!=quit_end_hr);
         if (is_quiet) {
-            ESP_LOGI(TAG, "Quiet night mode");
             volume_div = SOUND_VOLUME_DIV4X;
         }
     } else {
-        ESP_LOGI(TAG, "No time data, Full volume");
+        ESP_LOGI(TAG, "No time data, Full sound volume");
     }
     soundSetVolumeDiv(volume_div);
+}
+
+void alert_callback(AlertRegionID_t region, ERegionState old, ERegionState new)
+{
+    ESP_LOGI(TAG, "CHANGED SAFE STATE from '%s' to '%s'", alertStateToStr(old), alertStateToStr(new));
+
+    check_volume();
 
     if (new == eZSUnsafe) {
         play_unsafe();
         return;
     } else {
         if (old == eZSUnsafe) play_safe();
-        else soundPlayFile("/fs/start.wav");
+        else {
+            if (!timeIsSynced()){
+                soundSetVolumeDiv(SOUND_VOLUME_DIV4X);
+            }
+            soundPlayFile("/fs/start.wav");
+        }
     }
 }
 
@@ -179,10 +187,12 @@ void app_main(void)
         } else {
             if (!connection_lost) {
                 connection_lost = true;
+                check_volume();
                 soundPlayFile("/fs/nowifi.wav");
             }
             wifiSTAConnect(wifi_settings);
             wifiWaitForWifi();
+            continue;
         }
         alertCheckSync();
 
@@ -197,6 +207,8 @@ void app_main(void)
                 if (OTA_PERFORMED == otaPerform(&ota_v))
                 {
                     ESP_LOGI(TAG, "OTA Performed. Restarting...");
+                    check_volume();
+                    soundPlayFile("/fs/nowifi.wav");
                     esp_restart();
                 }
             }
