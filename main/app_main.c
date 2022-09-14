@@ -2,6 +2,7 @@
 #include <string.h>
 #include <sys/unistd.h>
 #include <sys/stat.h>
+#include <time.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_err.h"
@@ -25,6 +26,15 @@ static const char* TAG = "mainapp";
 #define APP_WIFI_AP     CONFIG_ESP_WIFI_SSID
 #define APP_WIFI_PASSWD CONFIG_ESP_WIFI_PASSWORD
 #define APP_WIFI_TRIES  CONFIG_ESP_MAXIMUM_RETRY
+
+#define OTA_HTTPS_URL "https://raw.githubusercontent.com/yurkis/rusnya_alert_bin/main/rusnya.bin"
+#define OTA_CHECK_INTERVAL (60*60)
+
+static SOTAConfig ota_conf = {
+    .url = OTA_HTTPS_URL,
+    .server_cert = OTA_HTTPS_CERT,
+    //.project_name = "rusnya",
+};
 
 static AlertRegionID_t my_alert_region = 9; /* Hardcoded Kyiv oblast */
 static uint8_t quit_start_hr = 22;
@@ -101,6 +111,7 @@ void app_init()
 
     my_version = otaParseVersionStr(APP_VERSION_STR);
     otaSetCurrentVersion(my_version);
+    otaSetConfig(ota_conf);
 }
 
 void play_unsafe()
@@ -174,6 +185,23 @@ void app_main(void)
             wifiWaitForWifi();
         }
         alertCheckSync();
+
+        if (timeIsSynced()) {
+            static time_t now;
+            static time_t last = {0};
+            time(&now);
+
+            if ((eZSSafe == alertState(my_alert_region)) && (OTA_CHECK_INTERVAL <= difftime(now, last))) {
+                last = now;
+                SVersion ota_v;
+                if (OTA_PERFORMED == otaPerform(&ota_v))
+                {
+                    ESP_LOGI(TAG, "OTA Performed. Restarting...");
+                    esp_restart();
+                }
+            }
+        }
+
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }
