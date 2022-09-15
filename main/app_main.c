@@ -28,10 +28,14 @@ static const char* TAG = "mainapp";
 #define APP_WIFI_TRIES  CONFIG_ESP_MAXIMUM_RETRY
 
 #define OTA_HTTPS_URL "https://raw.githubusercontent.com/yurkis/rusnya_alert_bin/main/rusnya.bin"
+#define OTA_HTTPS_DATA_URL "https://raw.githubusercontent.com/yurkis/rusnya_alert_bin/main/storage.bin"
+#define DATA_PARTITION "storage"
 #define OTA_CHECK_INTERVAL (60*60)
 
 static SOTAConfig ota_conf = {
     .url = OTA_HTTPS_URL,
+    .data_url = OTA_HTTPS_DATA_URL,
+    .data_partition_name = DATA_PARTITION,
     .server_cert = OTA_HTTPS_CERT,
     //.project_name = "rusnya",
 };

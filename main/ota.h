@@ -12,6 +12,8 @@ typedef struct _SVersion
 typedef struct _SOTAConfig
 {
     const char* url;
+    const char* data_url;
+    const char* data_partition_name;
     const char* server_cert;
     const char* project_name;
 }SOTAConfig;
@@ -27,6 +29,9 @@ SVersion otaParseVersionStr(const char* str);
 #define OTA_ERR_HTTP_CONNECT (-1)
 #define OTA_ERR_BIN_FORMAT   (-2)
 #define OTA_ERR_PROJECT_NAME (-3)
+#define OTA_ERR_PARTITION_NOT_FOUND (-4)
+#define OTA_ERR_PARTITION_ERASE (-5)
+#define OTA_ERR_PARTITION_WRITE (-6)
 #define OTA_FAILED           (-9)
 
 
