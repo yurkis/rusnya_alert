@@ -2,6 +2,7 @@
 #include <string.h>
 #include <sys/unistd.h>
 #include <sys/stat.h>
+#include <time.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_err.h"
@@ -14,6 +15,9 @@
 #include "wifi.h"
 #include "alert_api.h"
 #include "sntp_time.h"
+#include "version.h"
+#include "ota.h"
+#include "ota_https_ssl.h"
 
 static const char* TAG = "mainapp";
 
@@ -23,9 +27,24 @@ static const char* TAG = "mainapp";
 #define APP_WIFI_PASSWD CONFIG_ESP_WIFI_PASSWORD
 #define APP_WIFI_TRIES  CONFIG_ESP_MAXIMUM_RETRY
 
+#define OTA_HTTPS_URL "https://raw.githubusercontent.com/yurkis/rusnya_alert_bin/main/rusnya.bin"
+#define OTA_HTTPS_DATA_URL "https://raw.githubusercontent.com/yurkis/rusnya_alert_bin/main/storage.bin"
+#define DATA_PARTITION "storage"
+#define OTA_CHECK_INTERVAL (60*60)
+
+static SOTAConfig ota_conf = {
+    .url = OTA_HTTPS_URL,
+    .data_url = OTA_HTTPS_DATA_URL,
+    .data_partition_name = DATA_PARTITION,
+    .server_cert = OTA_HTTPS_CERT,
+    //.project_name = "rusnya",
+};
+
 static AlertRegionID_t my_alert_region = 9; /* Hardcoded Kyiv oblast */
 static uint8_t quit_start_hr = 22;
 static uint8_t quit_end_hr = 9;
+
+SVersion my_version;
 
 static SWiFiSTASettings wifi_settings = {
     .ap = APP_WIFI_AP,
@@ -81,10 +100,19 @@ bool initNVS()
 
 void app_init()
 {
-    /*app_desc = esp_app_get_description();
-    ESP_LOGI("App ver: %s", app_desc.version);*/
+    ESP_LOGI(TAG,"\nApp ver: %s\n",APP_VERSION_STR);
 
     initSPIFFS();
+
+    static char data_ver[64] = {0};
+    FILE* f = fopen("/fs/version.txt", "r");
+    if (f == NULL) {
+        ESP_LOGE(TAG, "Can't check data version");
+    } else {
+        fread(data_ver, 1, sizeof(data_ver)-1, f);
+        ESP_LOGI(TAG,"Data version: %s", data_ver);
+    }
+
     soundSetup();
     initNVS();
 
@@ -94,6 +122,10 @@ void app_init()
     wifiWaitForWifi();
     timeSetTimezone(UA_TZ);
     timeSync();
+
+    my_version = otaParseVersionStr(APP_VERSION_STR);
+    otaSetCurrentVersion(my_version);
+    otaSetConfig(ota_conf);
 }
 
 void play_unsafe()
@@ -111,11 +143,8 @@ void play_safe()
     }
 }
 
-void alert_callback(AlertRegionID_t region, ERegionState old, ERegionState new)
+void check_volume()
 {
-    ESP_LOGI(TAG, "CHANGED SAFE STATE from '%s' to '%s'", alertStateToStr(old), alertStateToStr(new));
-
-    // Check for night mode and set volume
     uint8_t volume_div = SOUND_VOLUME_NO_DIV;
     if (timeIsSynced()) {
         time_t now;
@@ -127,20 +156,31 @@ void alert_callback(AlertRegionID_t region, ERegionState old, ERegionState new)
                                                     ((hr>=quit_start_hr) && (hr<=quit_end_hr));
         is_quiet &= (quit_start_hr!=quit_end_hr);
         if (is_quiet) {
-            ESP_LOGI(TAG, "Quiet night mode");
             volume_div = SOUND_VOLUME_DIV4X;
         }
     } else {
-        ESP_LOGI(TAG, "No time data, Full volume");
+        ESP_LOGI(TAG, "No time data, Full sound volume");
     }
     soundSetVolumeDiv(volume_div);
+}
+
+void alert_callback(AlertRegionID_t region, ERegionState old, ERegionState new)
+{
+    ESP_LOGI(TAG, "CHANGED SAFE STATE from '%s' to '%s'", alertStateToStr(old), alertStateToStr(new));
+
+    check_volume();
 
     if (new == eZSUnsafe) {
         play_unsafe();
         return;
     } else {
         if (old == eZSUnsafe) play_safe();
-        else soundPlayFile("/fs/start.wav");
+        else {
+            if (!timeIsSynced()){
+                soundSetVolumeDiv(SOUND_VOLUME_DIV4X);
+            }
+            soundPlayFile("/fs/start.wav");
+        }
     }
 }
 
@@ -161,12 +201,33 @@ void app_main(void)
         } else {
             if (!connection_lost) {
                 connection_lost = true;
+                check_volume();
                 soundPlayFile("/fs/nowifi.wav");
             }
             wifiSTAConnect(wifi_settings);
             wifiWaitForWifi();
+            continue;
         }
         alertCheckSync();
+
+        if (timeIsSynced()) {
+            static time_t now;
+            static time_t last = {0};
+            time(&now);
+
+            if ((eZSSafe == alertState(my_alert_region)) && (OTA_CHECK_INTERVAL <= difftime(now, last))) {
+                last = now;
+                SVersion ota_v;
+                if (OTA_PERFORMED == otaPerform(&ota_v))
+                {
+                    ESP_LOGI(TAG, "OTA Performed. Restarting...");
+                    check_volume();
+                    soundPlayFile("/fs/nowifi.wav");
+                    esp_restart();
+                }
+            }
+        }
+
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }
