@@ -103,6 +103,16 @@ void app_init()
     ESP_LOGI(TAG,"\nApp ver: %s\n",APP_VERSION_STR);
 
     initSPIFFS();
+
+    static char data_ver[64] = {0};
+    FILE* f = fopen("/fs/version.txt", "r");
+    if (f == NULL) {
+        ESP_LOGE(TAG, "Can't check data version");
+    } else {
+        fread(data_ver, 1, sizeof(data_ver)-1, f);
+        ESP_LOGI(TAG,"Data version: %s", data_ver);
+    }
+
     soundSetup();
     initNVS();
 
