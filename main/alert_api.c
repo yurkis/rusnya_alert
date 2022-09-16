@@ -102,33 +102,28 @@ bool alertConnect()
         return false;
     }
     res = connect(sfd, (const struct sockaddr *)ipv4, sizeof(*ipv4));
-    if (res>0) {
+    /*if (res>0) {
         close(sfd);
         sfd=-1;
-    }
+    }*/
     if (res < 0){
         ESP_LOGE(TAG, "Can't connect");
-        freeaddrinfo(result);
-        return false;
+        /*freeaddrinfo(result);
+        return false;*/
+        goto error;
     }
 
     res = send(sfd, CONNECT_STR, strlen(CONNECT_STR),0);
     if (res < 0){
         ESP_LOGE(TAG, "Can't send");
-        freeaddrinfo(result);
-        close(sfd);
-        connected = false;
-        return false;
+        goto error;
     }
 
     size_t ok_len = strlen(OK_RESPONSE);
     res = recv(sfd, buff, ok_len, 0);
     if (res < 0){
         ESP_LOGE(TAG, "Can't resceive");
-        freeaddrinfo(result);
-        close(sfd);
-        connected = false;
-        return false;
+        goto error;
     }
     buff[ok_len] = 0;
 
@@ -137,6 +132,12 @@ bool alertConnect()
     freeaddrinfo(result);
     connected = true;
     return (0 == strcmp(buff, OK_RESPONSE));
+error:
+    freeaddrinfo(result);
+    if (sfd > 0) close(sfd);
+    sfd=-1;
+    connected = false;
+    return false;
 }
 
 const char* alertStateToStr(ERegionState state)
@@ -226,6 +227,7 @@ bool alertCheckSync()
     if (res < 0){
         ESP_LOGE(TAG, "Can't resceive");
         close(sfd);
+        sfd = -1;
         connected = false;
         return false;
     }
