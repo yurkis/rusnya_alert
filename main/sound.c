@@ -129,7 +129,7 @@ bool soundSetup()
 bool soundPlayFile(const char* filename)
 {
     size_t i2s_sent;
-    ESP_LOGI(TAG, "Playing file %s", filename);
+    ESP_LOGI(TAG, "Playing %s", filename);
     FILE* f = fopen(filename, "r");
     if (f == NULL) {
         ESP_LOGE(TAG, "Failed to open file for reading");

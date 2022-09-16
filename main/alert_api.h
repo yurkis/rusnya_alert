@@ -46,4 +46,5 @@ bool alertSetObserver(AlertRegionID_t region, cbAlertRegionStatusChanged cb);
 bool alertIsConnected();
 ERegionState alertState(AlertRegionID_t region);
 const char* alertStateToStr(ERegionState state);
+const char *alertRegionToStr(AlertRegionID_t region);
 

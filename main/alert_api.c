@@ -21,21 +21,51 @@ static int sfd = -1;
 static char buff [250];
 
 static const char* CONNECT_STR = CONFIG_BACKEND_API_KEY"\n";
+static const char* const OK_RESPONSE = "a:ok\n";
 
 typedef struct _SAlertZone
 {
     ERegionState state;
     cbAlertRegionStatusChanged cb;
+    const char* name;
 }SAlertZone;
 
-static SAlertZone zones[MAX_ALERT_ZONES];
+static SAlertZone zones[MAX_ALERT_ZONES] = {
+/* 1*/    {.name = "Вінницька обл."},
+/* 2*/    {.name = "Волинська обл."},
+/* 3*/    {.name = "Дніпропетровська обл."},
+/* 4*/    {.name = "Донецька обл."},
+/* 5*/    {.name = "Житомирська обл."},
+/* 6*/    {.name = "Закарпатська обл."},
+/* 7*/    {.name = "Запорізька обл."},
+/* 8*/    {.name = "Івано-Франківська обл."},
+/* 9*/    {.name = "Київська обл."},
+/*10*/    {.name = "Кіровоградська обл."},
+/*11*/    {.name = "Луганська обл."},
+/*12*/    {.name = "Львівська обл."},
+/*13*/    {.name = "Миколаївська обл."},
+/*14*/    {.name = "Одеська обл."},
+/*15*/    {.name = "Полтавська обл."},
+/*16*/    {.name = "Рівненська обл."},
+/*17*/    {.name = "Сумська обл."},
+/*18*/    {.name = "Тернопільська обл."},
+/*19*/    {.name = "Харківська обл."},
+/*20*/    {.name = "Херсонська обл."},
+/*21*/    {.name = "Хмельницька обл."},
+/*22*/    {.name = "Черкаська обл."},
+/*23*/    {.name = "Чернівецька обл."},
+/*24*/    {.name = "Чернігівська обл."},
+/*25*/    {.name = "м. Київ"},
+};
 
 bool alertConnect()
 {
     //resolve host
     ESP_LOGI(TAG,"Connecting to backend...");
 
-    memset(zones, 0, sizeof(zones));
+    for(int i=0; i<MAX_ALERT_ZONES; i++) {
+        zones[i].state = eZSUnknown;
+    }
 
     const struct addrinfo hints = {
             .ai_family = AF_INET,
@@ -90,7 +120,8 @@ bool alertConnect()
         return false;
     }
 
-    res = recv(sfd, buff, sizeof(buff), 0);
+    size_t ok_len = strlen(OK_RESPONSE);
+    res = recv(sfd, buff, ok_len, 0);
     if (res < 0){
         ESP_LOGE(TAG, "Can't resceive");
         freeaddrinfo(result);
@@ -98,13 +129,13 @@ bool alertConnect()
         connected = false;
         return false;
     }
-    printf("%s", buff);
+    buff[ok_len] = 0;
 
     //TODO: check for "a:ok"
 
     freeaddrinfo(result);
     connected = true;
-    return true;
+    return (0 == strcmp(buff, OK_RESPONSE));
 }
 
 const char* alertStateToStr(ERegionState state)
@@ -156,9 +187,9 @@ static void parse_state(char* line, size_t len)
     }
 
     if (zones[zone].state != state) {
-        ESP_LOGI(TAG," Zone %i state changed from %s to %s", zone_num,
-                                                             alertStateToStr(zones[zone].state),
-                                                             alertStateToStr(state));
+        ESP_LOGI(TAG,"(%i) %s: %s -> %s", zone_num, alertRegionToStr(zone_num),
+                                            alertStateToStr(zones[zone].state),
+                                            alertStateToStr(state));
         if (zones[zone].cb) {
             zones[zone].cb((uint8_t)zone_num, zones[zone].state, state);
         }
@@ -242,4 +273,17 @@ ERegionState alertState(AlertRegionID_t region)
         return eZSUnknown;
     }
     return zones[region-1].state;
+}
+
+const char *alertRegionToStr(AlertRegionID_t region)
+{
+    static const char* UNKNOWN = "UNKNOWN";
+    if ((region < 1) || (region > MAX_ALERT_ZONES)) {
+        ESP_LOGE(TAG, "alertRegionToStr: wrong region");
+        return UNKNOWN;
+    }
+    if (!zones[region-1].name) {
+        return UNKNOWN;
+    }
+    return zones[region-1].name;
 }
