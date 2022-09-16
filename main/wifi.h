@@ -25,3 +25,6 @@ void wifiSTASetCallbacks(SWiFiCallbacks callbacks);
 bool wifiSTAConnect(SWiFiSTASettings s);
 bool wifiIsConnected();
 bool wifiWaitForWifi();
+bool wifiSTADisconnect();
+
+void wifiRegisterConsole();

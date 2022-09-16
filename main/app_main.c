@@ -9,7 +9,6 @@
 #include "esp_log.h"
 #include "esp_spiffs.h"
 #include "nvs_flash.h"
-//#include "esp_app_desc.h"
 
 #include "sound.h"
 #include "wifi.h"
@@ -18,6 +17,8 @@
 #include "version.h"
 #include "ota.h"
 #include "ota_https_ssl.h"
+
+#include "esp_console.h"
 
 static const char* TAG = "mainapp";
 
@@ -98,6 +99,28 @@ bool initNVS()
     return false;
 }
 
+bool initConsole()
+{
+    esp_console_repl_t *repl = NULL;
+    esp_console_repl_config_t repl_config = ESP_CONSOLE_REPL_CONFIG_DEFAULT();
+       /* Prompt to be printed before each line.
+        * This can be customized, made dynamic, etc.
+        */
+    repl_config.prompt = "alert"">";
+    repl_config.max_cmdline_length = 256;
+
+    esp_console_register_help_command();
+    wifiRegisterConsole();
+    alertRegisterConsole();
+
+    esp_console_dev_uart_config_t hw_config = ESP_CONSOLE_DEV_UART_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_console_new_repl_uart(&hw_config, &repl_config, &repl));
+
+    ESP_ERROR_CHECK(esp_console_start_repl(repl));
+
+    return true;
+}
+
 void app_init()
 {
     ESP_LOGI(TAG,"\nApp ver: %s\n",APP_VERSION_STR);
@@ -126,6 +149,8 @@ void app_init()
     my_version = otaParseVersionStr(APP_VERSION_STR);
     otaSetCurrentVersion(my_version);
     otaSetConfig(ota_conf);
+
+    initConsole();
 }
 
 void play_unsafe()

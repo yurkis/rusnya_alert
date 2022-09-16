@@ -5,6 +5,7 @@
 #include "lwip/inet.h"
 #include "lwip/ip4_addr.h"
 #include "lwip/dns.h"
+#include "esp_console.h"
 #include <unistd.h>
 #include <sys/socket.h>
 #include <errno.h>
@@ -190,10 +191,11 @@ static void parse_state(char* line, size_t len)
         ESP_LOGI(TAG,"(%i) %s: %s -> %s", zone_num, alertRegionToStr(zone_num),
                                             alertStateToStr(zones[zone].state),
                                             alertStateToStr(state));
-        if (zones[zone].cb) {
-            zones[zone].cb((uint8_t)zone_num, zones[zone].state, state);
-        }
+        ERegionState old_state = zones[zone].state;
         zones[zone].state = state;
+        if (zones[zone].cb) {
+            zones[zone].cb((uint8_t)zone_num, old_state, state);
+        }
     }
 }
 
@@ -286,4 +288,93 @@ const char *alertRegionToStr(AlertRegionID_t region)
         return UNKNOWN;
     }
     return zones[region-1].name;
+}
+
+static int cliList(int argc, char **argv)
+{
+    printf("ID:\t|State:\t|Name:\n");
+    for(int i=0; i<MAX_ALERT_ZONES; i++){
+        printf("#%i\t %s\t %s\n", i+1, alertStateToStr(zones[i].state), zones[i].name);
+    }
+    return 0;
+}
+
+
+static int cliSet(int argc, char **argv)
+{
+    static const char* cliSet__state_help = "\t\t<state> (-1) - unknown, (0) - safe, (1) - unsafe\n";
+    if (argc<3){
+        printf("Usage: %s <region_id> <state>\n", argv[0]);
+        printf(cliSet__state_help);
+        return 0;
+    }
+    size_t reg_id = atoi(argv[1]);
+    size_t int_state = atoi(argv[2]);
+    ERegionState state = eZSUnknown;
+    switch (int_state){
+        case -1: state = eZSUnknown; break;
+        case  0: state = eZSSafe; break;
+        case  1: state = eZSUnsafe; break;
+        default: printf(cliSet__state_help); return 0;
+    }
+    if ((reg_id<1) || (reg_id>=MAX_ALERT_ZONES)) {
+        printf("Wrong region id\n");
+        return 0;
+    }
+    if (zones[reg_id-1].state != state) {
+        ERegionState old_state = zones[reg_id-1].state;
+        zones[reg_id-1].state = state;
+        if (zones[reg_id-1].cb) {
+            zones[reg_id-1].cb((uint8_t)reg_id, old_state, state);
+        }
+    }
+    return 0;
+}
+
+typedef struct _SCLISubCmd{
+    const char* cmd;
+    const char* desc;
+    int (*handler)(int argc, char **argv);
+}SCLISubCmd;
+
+static SCLISubCmd cmds[]= {
+    {"list", "List regions with IDs and states",cliList},
+    {"set",  "<region> <state> Set region state",cliSet},
+    {0,0,0}
+};
+
+static void cliWiFiBanner()
+{
+    printf("Subcommands:\n");
+    for(size_t i=0; (cmds[i].cmd && cmds[i].handler); i++){
+        printf("\t%s\t%s\n", cmds[i].cmd, cmds[i].desc);
+    }
+}
+
+static int cliAlert(int argc, char **argv)
+{
+    size_t i=0;
+    if (argc<2){
+        cliWiFiBanner();
+        return 0;
+    }
+    for(i=0; (cmds[i].cmd && cmds[i].handler); i++){
+        if (!strcmp(argv[1], cmds[i].cmd)){
+            printf("\n");
+            return cmds[i].handler(argc-1, argv+1);
+        }
+    }
+    cliWiFiBanner();
+    return 0;
+}
+
+void alertRegisterConsole()
+{
+    const esp_console_cmd_t cmd = {
+            .command = "alert",
+            .help = "Alert protocol commands set",
+            .hint = NULL,
+            .func = &cliAlert,
+    };
+    ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
 }

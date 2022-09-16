@@ -12,6 +12,8 @@
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
+#include "esp_console.h"
+
 #include <string.h>
 
 #define WIFI_CONNECTED_BIT BIT0
@@ -132,3 +134,62 @@ bool wifiWaitForWifi()
                 portMAX_DELAY);
     return (bits & WIFI_CONNECTED_BIT);
 }
+
+bool wifiSTADisconnect()
+{
+    esp_wifi_disconnect();
+    return true;
+}
+
+/////////////// Console
+static int cliDisconnect(int argc, char **argv)
+{
+    wifiSTADisconnect();
+    return 0;
+}
+
+typedef struct _SCLISubCmd{
+    const char* cmd;
+    int (*handler)(int argc, char **argv);
+}SCLISubCmd;
+
+static SCLISubCmd cmds[]= {
+    {"disconnect", cliDisconnect},
+    {0,0}
+};
+
+static void cliWiFiBanner()
+{
+    printf("Subcommands:\n");
+    for(size_t i=0; (cmds[i].cmd && cmds[i].handler); i++){
+        printf("\t%s\n", cmds[i].cmd);
+    }
+}
+
+static int cliWifi(int argc, char **argv)
+{
+    size_t i=0;
+    if (argc<2){
+        cliWiFiBanner();
+        return 0;
+    }
+    for(i=0; (cmds[i].cmd && cmds[i].handler); i++){
+        if (!strcmp(argv[1], cmds[i].cmd)){
+            return cmds[i].handler(argc-1, argv+1);
+        }
+    }
+    cliWiFiBanner();
+    return 0;
+}
+
+void wifiRegisterConsole()
+{
+    const esp_console_cmd_t cmd = {
+            .command = "wifi",
+            .help = "Get version of chip and SDK",
+            .hint = NULL,
+            .func = &cliWifi,
+    };
+    ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
+}
+
