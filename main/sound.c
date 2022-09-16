@@ -150,6 +150,7 @@ bool soundPlayFile(const char* filename)
         //ESP_LOGI(TAG, "current: %d", buffers.current);
         xQueueReceive(xTXDoneQueue, &( i2s_sent ), portMAX_DELAY );
     }
+    fclose(f);
     return true;
 }
 

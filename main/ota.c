@@ -1,7 +1,7 @@
 #include "esp_err.h"
 #include "esp_log.h"
 
-#include "esp_app_format.h"
+//#include "esp_app_format.h"
 #include "esp_http_client.h"
 #include "esp_crt_bundle.h"
 #include "esp_ota_ops.h"
