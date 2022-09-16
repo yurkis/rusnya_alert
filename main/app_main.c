@@ -112,6 +112,7 @@ bool initConsole()
     esp_console_register_help_command();
     wifiRegisterConsole();
     alertRegisterConsole();
+    otaRegisterConsole();
 
     esp_console_dev_uart_config_t hw_config = ESP_CONSOLE_DEV_UART_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_console_new_repl_uart(&hw_config, &repl_config, &repl));

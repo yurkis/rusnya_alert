@@ -7,7 +7,7 @@
 #include "esp_ota_ops.h"
 #include "esp_https_ota.h"
 #include "esp_partition.h"
-//#include "spi_flash.h"
+#include "esp_console.h"
 
 #include "ota.h"
 #include <string.h>
@@ -31,8 +31,8 @@ static version_t version2raw(SVersion ver)
 static SVersion raw2version(version_t raw)
 {
    SVersion v;
-   v.major = (raw<<24) & 0xff;
-   v.minor = (raw<<16) & 0xff;
+   v.major = (raw>>24) & 0xff;
+   v.minor = (raw>>16) & 0xff;
    v.build = raw & 0xffff;
    return v;
 }
@@ -209,4 +209,102 @@ int otaPerform(SVersion *ota_ver)
     }
 
     return OTA_PERFORMED;
+}
+
+
+/////////////////////// CLI ///////////////////////////
+static int cliVer(int argc, char **argv)
+{
+    SVersion ver = raw2version(curr_version);
+    printf("Current version: %i.%i.%i", ver.major, ver.minor, ver.build);
+    return 0;
+}
+
+static int cliCheck(int argc, char **argv)
+{
+    SVersion ver;
+    int res = otaCheck(&ver);
+    printf("Remote version: %i.%i.%i\n", ver.major, ver.minor, ver.build);
+    if (OTA_UPDATE_FOUND ==  res) printf("OTA update vailable!\n");
+    else if (OTA_NO_UPDATE != res) {printf("ERROR: %i", res);}
+    return 0;
+}
+
+static int cliUpdate(int argc, char **argv)
+{
+    SVersion ver;
+    int res = otaPerform(&ver);
+    if (OTA_PERFORMED == res) {
+        printf("Performed OTA to: %i.%i.%i\n", ver.major, ver.minor, ver.build);
+        return 0;
+    }
+    if (OTA_NO_UPDATE == res) {
+        printf("No update found!\n");
+        return 0;
+    }
+    printf("Error: %i\n", res);
+    return 0;
+}
+
+static int cliSetVer(int argc, char **argv)
+{
+   if (argc<2){
+        printf("Usage: %s <version>\n", argv[0]);
+        return 0;
+    }
+    SVersion ver = otaParseVersionStr(argv[1]);
+    otaSetCurrentVersion(ver);
+    return 0;
+}
+
+typedef struct _SCLISubCmd{
+    const char* cmd;
+    const char* desc;
+    int (*handler)(int argc, char **argv);
+}SCLISubCmd;
+
+static SCLISubCmd cmds[]= {
+    {"ver",    "Current app version",cliVer},
+    {"check",  "Check for update",cliCheck},
+    {"update", "List regions with IDs and states",cliUpdate},
+    {"set_ver",  "<vaesion> Set current app version",cliSetVer},
+    {0,0,0}
+};
+
+static void cliBanner()
+{
+    printf("Subcommands:\n");
+    for(size_t i=0; (cmds[i].cmd && cmds[i].handler); i++){
+        printf("\t%s\t%s\n", cmds[i].cmd, cmds[i].desc);
+    }
+}
+
+static int cliOTA(int argc, char **argv)
+{
+    size_t i=0;
+    if (argc<2){
+        cliBanner();
+        return 0;
+    }
+    for(i=0; (cmds[i].cmd && cmds[i].handler); i++){
+        if (!strcmp(argv[1], cmds[i].cmd)){
+            printf("\n");
+            int ret = cmds[i].handler(argc-1, argv+1);
+            printf("\n");
+            return ret;
+        }
+    }
+    cliBanner();
+    return 0;
+}
+
+void otaRegisterConsole()
+{
+    const esp_console_cmd_t cmd = {
+            .command = "ota",
+            .help = "OTA update commands set",
+            .hint = NULL,
+            .func = &cliOTA,
+    };
+    ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
 }

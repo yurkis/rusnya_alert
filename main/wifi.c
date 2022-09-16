@@ -175,7 +175,10 @@ static int cliWifi(int argc, char **argv)
     }
     for(i=0; (cmds[i].cmd && cmds[i].handler); i++){
         if (!strcmp(argv[1], cmds[i].cmd)){
-            return cmds[i].handler(argc-1, argv+1);
+            printf("\n");
+            int ret = cmds[i].handler(argc-1, argv+1);
+            printf("\n");
+            return ret;
         }
     }
     cliWiFiBanner();

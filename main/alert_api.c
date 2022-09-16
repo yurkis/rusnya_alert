@@ -290,6 +290,7 @@ const char *alertRegionToStr(AlertRegionID_t region)
     return zones[region-1].name;
 }
 
+/////////////////////// CLI ///////////////////////////
 static int cliList(int argc, char **argv)
 {
     printf("ID:\t|State:\t|Name:\n");
@@ -343,7 +344,7 @@ static SCLISubCmd cmds[]= {
     {0,0,0}
 };
 
-static void cliWiFiBanner()
+static void cliBanner()
 {
     printf("Subcommands:\n");
     for(size_t i=0; (cmds[i].cmd && cmds[i].handler); i++){
@@ -355,16 +356,18 @@ static int cliAlert(int argc, char **argv)
 {
     size_t i=0;
     if (argc<2){
-        cliWiFiBanner();
+        cliBanner();
         return 0;
     }
     for(i=0; (cmds[i].cmd && cmds[i].handler); i++){
         if (!strcmp(argv[1], cmds[i].cmd)){
             printf("\n");
-            return cmds[i].handler(argc-1, argv+1);
+            int ret = cmds[i].handler(argc-1, argv+1);
+            printf("\n");
+            return ret;
         }
     }
-    cliWiFiBanner();
+    cliBanner();
     return 0;
 }
 

@@ -39,3 +39,5 @@ void otaSetCurrentVersion(SVersion ver);
 void otaSetConfig(SOTAConfig config);
 int  otaCheck(SVersion* ota_ver);
 int  otaPerform(SVersion *ota_ver);
+
+void otaRegisterConsole();
