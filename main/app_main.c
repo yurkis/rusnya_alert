@@ -54,12 +54,12 @@ static SWiFiSTASettings wifi_settings = {
     .tries = APP_WIFI_TRIES,
 };
 
+#define LED_GPIO_NUM (GPIO_NUM_23)
 static led_pattern_t led_pattern;
 static  SLedPattern LED_NOT_CONNECTED = {.pattern =0b10, .bits = 2, .time = 500};
 static  SLedPattern LED_NORMAL = {.pattern =0b000000000001, .bits = 16, .time = 2000};
+static  SLedPattern LED_SETUP = {.pattern =0b01, .bits = 16, .time = 200};
 static const SLedPattern LED_ALERT = LED_PATTERN_ON;
-
-//const esp_app_desc_t * app_desc;
 
 void initSPIFFS()
 {
@@ -109,9 +109,6 @@ bool initConsole()
 {
     esp_console_repl_t *repl = NULL;
     esp_console_repl_config_t repl_config = ESP_CONSOLE_REPL_CONFIG_DEFAULT();
-       /* Prompt to be printed before each line.
-        * This can be customized, made dynamic, etc.
-        */
     repl_config.prompt = "alert"">";
     repl_config.max_cmdline_length = 256;
 
@@ -130,10 +127,10 @@ bool initConsole()
 
 void app_init()
 {
-    ESP_LOGI(TAG,"\nApp ver: %s\n",APP_VERSION_STR);
-
-    led_pattern = lpCreate(GPIO_NUM_23);
+    led_pattern = lpCreate(LED_GPIO_NUM);
     lpSetPattern(led_pattern, &LED_NOT_CONNECTED);
+
+    ESP_LOGI(TAG,"\nApp ver: %s\n",APP_VERSION_STR);
 
     initSPIFFS();
 
@@ -217,6 +214,7 @@ void alert_callback(AlertRegionID_t region, ERegionState old, ERegionState new)
                 soundSetVolumeDiv(SOUND_VOLUME_DIV4X);
             }
             lpSetPattern(led_pattern, &LED_NORMAL);
+            //lpDestroy(led_pattern);
             soundPlayFile("/fs/start.wav");
         }
     }

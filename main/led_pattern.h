@@ -16,6 +16,6 @@ typedef struct _SLedPattern
 #define LED_PATTERN_OFF {.pattern=0x00, .bits=8, .time=1000}
 
 led_pattern_t lpCreate(gpio_num_t gpio);
-bool          lpDestroy(led_pattern_t instance);
-bool lpSetPattern(led_pattern_t instance, SLedPattern *pattern);
+void          lpDestroy(led_pattern_t instance);
+bool          lpSetPattern(led_pattern_t instance, SLedPattern *pattern);
 
