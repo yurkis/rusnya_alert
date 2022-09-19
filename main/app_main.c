@@ -1,15 +1,3 @@
-#include <stdio.h>
-#include <string.h>
-#include <sys/unistd.h>
-#include <sys/stat.h>
-#include <time.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "esp_err.h"
-#include "esp_log.h"
-#include "esp_spiffs.h"
-#include "nvs_flash.h"
-
 #include "sound.h"
 #include "wifi.h"
 #include "alert_api.h"
@@ -17,8 +5,21 @@
 #include "version.h"
 #include "ota.h"
 #include "ota_https_ssl.h"
+#include "led_pattern.h"
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_err.h"
+#include "esp_log.h"
+#include "esp_spiffs.h"
+#include "nvs_flash.h"
 #include "esp_console.h"
+
+#include <stdio.h>
+#include <string.h>
+#include <sys/unistd.h>
+#include <sys/stat.h>
+#include <time.h>
 
 static const char* TAG = "mainapp";
 
@@ -52,6 +53,11 @@ static SWiFiSTASettings wifi_settings = {
     .passwd = APP_WIFI_PASSWD,
     .tries = APP_WIFI_TRIES,
 };
+
+static led_pattern_t led_pattern;
+static  SLedPattern LED_NOT_CONNECTED = {.pattern =0b10, .bits = 2, .time = 500};
+static  SLedPattern LED_NORMAL = {.pattern =0b000000000001, .bits = 16, .time = 2000};
+static const SLedPattern LED_ALERT = LED_PATTERN_ON;
 
 //const esp_app_desc_t * app_desc;
 
@@ -126,6 +132,9 @@ void app_init()
 {
     ESP_LOGI(TAG,"\nApp ver: %s\n",APP_VERSION_STR);
 
+    led_pattern = lpCreate(GPIO_NUM_23);
+    lpSetPattern(led_pattern, &LED_NOT_CONNECTED);
+
     initSPIFFS();
 
     static char data_ver[64] = {0};
@@ -156,6 +165,7 @@ void app_init()
 
 void play_unsafe()
 {
+    lpSetPattern(led_pattern, &LED_ALERT);
     for (int i=0;i<3;i++){
         soundPlayFile("/fs/ALARM.wav");
         soundPlayFile("/fs/01.wav");
@@ -167,6 +177,7 @@ void play_safe()
     for (int i=0;i<3;i++){
         soundPlayFile("/fs/SAFE.wav");
     }
+    lpSetPattern(led_pattern, &LED_NORMAL);
 }
 
 void check_volume()
@@ -205,6 +216,7 @@ void alert_callback(AlertRegionID_t region, ERegionState old, ERegionState new)
             if (!timeIsSynced()){
                 soundSetVolumeDiv(SOUND_VOLUME_DIV4X);
             }
+            lpSetPattern(led_pattern, &LED_NORMAL);
             soundPlayFile("/fs/start.wav");
         }
     }
@@ -229,6 +241,7 @@ void app_main(void)
                 connection_lost = true;
                 check_volume();
                 soundPlayFile("/fs/nowifi.wav");
+                //lpSetPattern(led_pattern, &LED_NOT_CONNECTED);
             }
             wifiSTAConnect(wifi_settings);
             wifiWaitForWifi();
