@@ -56,7 +56,7 @@ led_pattern_t lpCreate(gpio_num_t gpio)
     instance->gpio = gpio;
     instance->xPatternQueue = xQueueCreate(2, sizeof(SLedPattern) );
     assert(instance->xPatternQueue);
-    BaseType_t ret = xTaskCreate(pattern_task, "blink", 512, instance, 2, NULL);
+    BaseType_t ret = xTaskCreate(pattern_task, "blink", 1024, instance, 2, NULL);
     if (pdPASS != ret) {
         ESP_LOGE(TAG, "xTaskCreate fail");
     }

@@ -58,6 +58,7 @@ static SWiFiSTASettings wifi_settings = {
 static led_pattern_t led_pattern;
 static  SLedPattern LED_NOT_CONNECTED = {.pattern =0b10, .bits = 2, .time = 500};
 static  SLedPattern LED_NORMAL = {.pattern =0b000000000001, .bits = 16, .time = 2000};
+static  SLedPattern LED_OTA = {.pattern =0b10101000010101, .bits = 16, .time = 2000};
 static  SLedPattern LED_SETUP = {.pattern =0b01, .bits = 16, .time = 200};
 static const SLedPattern LED_ALERT = LED_PATTERN_ON;
 
@@ -239,7 +240,7 @@ void app_main(void)
                 connection_lost = true;
                 check_volume();
                 soundPlayFile("/fs/nowifi.wav");
-                //lpSetPattern(led_pattern, &LED_NOT_CONNECTED);
+                lpSetPattern(led_pattern, &LED_NOT_CONNECTED);
             }
             wifiSTAConnect(wifi_settings);
             wifiWaitForWifi();
@@ -255,16 +256,19 @@ void app_main(void)
             if ((eZSSafe == alertState(my_alert_region)) && (OTA_CHECK_INTERVAL <= difftime(now, last))) {
                 last = now;
                 SVersion ota_v;
-                if (OTA_PERFORMED == otaPerform(&ota_v))
-                {
-                    ESP_LOGI(TAG, "OTA Performed. Restarting...");
-                    check_volume();
-                    soundPlayFile("/fs/nowifi.wav");
-                    esp_restart();
+                if (OTA_UPDATE_FOUND == otaCheck(&ota_v)){
+                    ESP_LOGI(TAG, "OTA package found");
+                    lpSetPattern(led_pattern, &LED_OTA);
+                    if (OTA_PERFORMED == otaPerform(&ota_v))
+                    {
+                        ESP_LOGI(TAG, "OTA Performed. Restarting...");
+                        check_volume();
+                        soundPlayFile("/fs/nowifi.wav");
+                        esp_restart();
+                    }
                 }
             }
         }
-
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }

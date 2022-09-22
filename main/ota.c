@@ -154,6 +154,11 @@ int otaPerform(SVersion *ota_ver)
     if (OTA_UPDATE_FOUND != ret) {
         return ret;
     }
+    return otaForcePerform(ota_ver);
+}
+
+int otaForcePerform(SVersion *ota_ver)
+{
     esp_http_client_config_t config = {
             .url = conf.url,
             .transport_type = HTTP_TRANSPORT_OVER_SSL,
