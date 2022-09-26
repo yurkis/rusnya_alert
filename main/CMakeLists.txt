@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.19)
-idf_component_register(SRCS "app_main.c" "sound.c" "wifi.c" "alert_api.c" "sntp_time.c" "version.h" "ota.c" "ota_https_ssl.h" "led_pattern.c"
-                    INCLUDE_DIRS ".")
+idf_component_register(SRCS "main.c" "app_main.c" "sound.c" "wifi.c" "alert_api.c" "sntp_time.c" "version.h" "ota.c" "ota_https_ssl.h" "led_pattern.c" "settings.c"
+                    INCLUDE_DIRS "."
+                    EMBED_FILES "res/alarm.wav" "res/connected.wav" "res/disconnected.wav" "res/safe.wav")
 
 spiffs_create_partition_image(storage ../spiffs FLASH_IN_PROJECT)
 

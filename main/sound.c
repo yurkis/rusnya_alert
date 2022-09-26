@@ -6,7 +6,7 @@
 #include "esp_log.h"
 #include "driver/i2s.h"
 
-#define SAMPLE_RATE     (8000)
+#define SAMPLE_RATE     (16000)
 #define DMA_BUF_LEN     (512)
 #define DMA_NUM_BUF     (2)
 #define I2S_NUM         (0)
@@ -67,6 +67,20 @@ static void i2s_play_task(void *userData)
     }
 }
 
+static void prepare_dma(const void* buffer, size_t size)
+{
+    static SI2SBuff* curr;
+    curr = &buffers.buffers[buffers.current];
+    size_t i2s_len = 0;
+    for(int i=0; i<size; i++) {
+        curr->buff[i2s_len*2] = curr->buff[i2s_len*2+1] = (((unsigned char*)buffer)[i]<<(8-volume_div))&0xff00;
+        i2s_len++;
+    }
+    curr->size = size*4;
+    xQueueSend(xPlayBufferQueue,( void * ) &curr,( TickType_t ) 0 );
+    buffers.current = (buffers.current==0)?1:0;
+}
+
 static bool read_chunk(FILE* f)
 {
     size_t size = DMA_BUF_LEN / ai.Multiplier;
@@ -74,14 +88,14 @@ static bool read_chunk(FILE* f)
     
     static unsigned char file_buff[DMA_BUF_LEN];
     size_t got = fread(file_buff, 1, size, f);
-    if (got ==0){
+    if (got <= 0){
         //ESP_LOGI(TAG, "Play finished");
         vTaskDelay(50 / portTICK_PERIOD_MS);
         i2s_stop(I2S_NUM);
         return false;
     }
     //ESP_LOGI(TAG, "Got: %d", got);
-    static SI2SBuff* curr;
+    /*static SI2SBuff* curr;
     curr = &buffers.buffers[buffers.current];
         
     size_t i2s_len = 0;
@@ -92,7 +106,8 @@ static bool read_chunk(FILE* f)
     }
     curr->size = got*4;
     xQueueSend(xPlayBufferQueue,( void * ) &curr,( TickType_t ) 0 );
-    buffers.current = (buffers.current==0)?1:0;
+    buffers.current = (buffers.current==0)?1:0;*/
+    prepare_dma(file_buff, got);
     return true;
 }
 
@@ -157,4 +172,21 @@ bool soundPlayFile(const char* filename)
 void soundSetVolumeDiv(uint8_t div)
 {
     volume_div = div;
+}
+
+bool soundPlayBuffer(const void *pBuff, size_t size)
+{
+   ESP_LOGI(TAG, "Playing sound");
+   i2s_start(I2S_NUM);
+
+   size_t chunk_size = DMA_BUF_LEN / ai.Multiplier;
+   size_t size2write = (size<chunk_size)?chunk_size:size;
+   prepare_dma(pBuff, size2write);
+
+   for(int i=0; i<size; i+=chunk_size)
+   {
+        size2write = ((i+chunk_size)<size)?chunk_size:(size-i);
+        prepare_dma(pBuff + i, size2write);
+   }
+   return true;
 }
